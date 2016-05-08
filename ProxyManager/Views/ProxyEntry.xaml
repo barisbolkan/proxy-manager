@@ -1,0 +1,94 @@
+﻿<ui:DialogWindow x:Class="ProxyMgr.ProxyManager.Views.ProxyEntry"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:ProxyMgr.ProxyManager"
+    xmlns:ui="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.12.0"
+    Title="Service Proxy Configuration" Height="315" Width="600" ResizeMode="NoResize"
+                 FocusManager.FocusedElement="{Binding ElementName=serviceAddrInput}" 
+    WindowStartupLocation="CenterScreen" Margin="0" Padding="0">
+
+    <Window.Resources>
+        <Style TargetType="{x:Type ContentControl}">
+            <Setter Property="KeyboardNavigation.IsTabStop" Value="False" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
+        <Style TargetType="{x:Type Label}" x:Key="seperator">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Label}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Grid.Column="0" Content="{TemplateBinding Content}"></Label>
+                            <Separator Grid.Column="1" VerticalAlignment="Center"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <ControlTemplate x:Key="placeholderTemplate" TargetType="{x:Type ContentControl}">
+            <Grid>
+                <TextBox Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=DataContext, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                         VerticalAlignment="Center" HorizontalAlignment="Stretch" VerticalContentAlignment="Center" Height="25" x:Name="SearchTermTextBox"/>
+                <TextBlock IsHitTestVisible="False" Text="{TemplateBinding Tag}" VerticalAlignment="Center" HorizontalAlignment="Left" 
+                           Margin="3,0,0,0" Foreground="DarkGray">
+                    <TextBlock.Style>
+                        <Style TargetType="{x:Type TextBlock}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=SearchTermTextBox}" Value="">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </ControlTemplate>
+    </Window.Resources>
+    <Grid x:Name="container">
+        <StackPanel Margin="15">
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"></ColumnDefinition>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <Image Stretch="None" Source="../Resources/information.png" Grid.Column="0"></Image>
+                <TextBlock Grid.Column="1" Margin="10, 0, 0, 0" Text="To generate proxy classes, enter a valid service WSDL address for metadata and a namespace for code generation, and click OK." TextWrapping="Wrap" />
+            </Grid>
+            <Label FontWeight="Bold" Content="Service Address:">
+            </Label>
+            <ContentControl x:Name="serviceAddrInput" DataContext="{Binding Path=ServiceAddress, Mode=TwoWay, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, ValidatesOnNotifyDataErrors=True}" 
+                            Template="{StaticResource placeholderTemplate}" Tag="http://www.sampleurl.com/myservice/myendpoint.svc"></ContentControl>
+            <Label FontWeight="Bold" Content="Namespace:" Margin="0,5,0,0"></Label>
+            <ContentControl DataContext="{Binding Path=ServiceName, Mode=TwoWay, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, ValidatesOnNotifyDataErrors=True}" 
+                            IsEnabled="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}, Path=DataContext.IsAddContext}"
+                            Template="{StaticResource placeholderTemplate}" Tag="ServiceReference" />
+            <Label FontWeight="Bold" Content="Generation Type:" Margin="0,5,0,0" Style="{StaticResource seperator}" />
+            <StackPanel>
+                <CheckBox Content="Generate Client Classes" IsChecked="{Binding GenerateClient}" />
+                <CheckBox Content="Use XmlSerializer (Check this only for invalid xsd's and invalid wsdl.)" IsChecked="{Binding UseXmlSerializer}" />
+            </StackPanel>
+            <Grid Margin="0,10,0,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Right">
+                    <Button IsEnabled="{Binding Path=ButtonEnabled}" Content="OK" Width="100" Height="30" Margin="0,0,10,0" Click="btnOK_Click"></Button>
+                    <Button Content="Cancel" Width="100" Height="30" Click="btnCancel_Click"></Button>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+        <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Left" Text=" * Something wrong with .svcmap file. Process will continue. This is just an info message." Foreground="Red">
+            <TextBlock.Style>
+                <Style TargetType="{x:Type TextBlock}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowMissingMap}" Value="true">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </Grid>
+</ui:DialogWindow>
