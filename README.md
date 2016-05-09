@@ -5,10 +5,10 @@ ProxyManager is a visual studio extension that enables to add or configure servi
  with ProxyManager you can easily seperate contracts and implementation.
 
 ## Features
-### Ability to add service references
+#### Ability to add service references
 By right-clicking on references you can create proxy classes via "Add Service Proxy" by providing a name and a valid metadata url.
 
-### Configure existing service references
+#### Configure existing service references
 By right-clicking on any service reference you can modify proxy classes via "Configure Service Proxy" by only changing the metadata url.
 
 ## Installation
