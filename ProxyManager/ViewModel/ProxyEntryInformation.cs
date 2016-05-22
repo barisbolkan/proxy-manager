@@ -9,7 +9,7 @@ namespace ProxyMgr.ProxyManager.ViewModel
     /// Represents the view model class for <see cref="ProxyEntry.xaml.cs"/>
     /// </summary>
     [XmlRoot(Namespace = "urn:proxymgr:scvmap", ElementName = "ProxyInfo")]
-    public class ProxyEntryInformation : INotifyPropertyChanged
+    public class ProxyEntryInformation : EventArgs, INotifyPropertyChanged
     {
         #region Fields
         /// <summary>

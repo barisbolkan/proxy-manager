@@ -35,7 +35,7 @@ namespace ProxyMgr.ProxyManager
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [Guid(GuidList.guidProxyManagerPkgString)]
     [ProvideAutoLoad(Microsoft.VisualStudio.Shell.Interop.UIContextGuids.SolutionExists)]
-    public sealed class ProxyManagerPackage : Package
+    public sealed class ProxyManagerPackage : Package, IDisposable
     {
         #region Fields
         /// <summary>
@@ -554,6 +554,14 @@ namespace ProxyMgr.ProxyManager
             {
                 LogWriter.WriteLine("[ FAIL ] Project reload failed! Exception: " + ex.ToString());
             }
+        }
+        #endregion
+
+        #region IDisposable Members
+        public void Dispose()
+        {
+            if (logWriter != null)
+                logWriter.Dispose();
         }
         #endregion
     }
