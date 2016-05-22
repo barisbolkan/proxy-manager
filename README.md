@@ -12,7 +12,8 @@ By right-clicking on references you can create proxy classes via "Add Service Pr
 By right-clicking on any service reference you can modify proxy classes via "Configure Service Proxy" by only changing the metadata url.
 
 ## Installation
-To use ProxyManager you must have Visual Studio.
+To use ProxyManager you must have Visual Studio. 
+To download ProxyManager you can use  NuGet or [this link](https://visualstudiogallery.msdn.microsoft.com/fcf52d8d-d809-4211-8ebe-ace254c65cf3).
 
 ## Version
 
