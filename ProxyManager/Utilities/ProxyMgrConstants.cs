@@ -33,11 +33,6 @@
         public const string ServiceModelAssemblyNamespace = "System.ServiceModel";
 
         /// <summary>
-        /// Template for file path of the generated file
-        /// </summary>
-        public const string GeneratedCodeFilePathTemplate = "{0}{1}{2}";
-
-        /// <summary>
         /// Template for the name of the code file
         /// </summary>
         public const string GeneratedCodeFileNameTemplate = "{0}.proxy.{1}";
@@ -45,7 +40,7 @@
         /// <summary>
         /// To generate the code, this is needed to pass to svcutil as arguments
         /// </summary>
-        public const string SvcutilCommandArgumentTemplate = @"{0} ""{1}"" /out:""{2}"" /l:{3} /ser:{4} /n:*,{5}.{6}";
+        public const string SvcutilCommandArgumentTemplate = @"{0} ""{1}"" /out:""{2}"" /l:{3} /serializer:{4} /n:*,{5}.{6}";
 
         /// <summary>
         /// Compile Tag name for project file

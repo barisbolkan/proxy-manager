@@ -73,6 +73,67 @@ namespace ProxyMgr.ProxyManager.Utilities
         }
 
         /// <summary>
+        /// Finds the interface element for given <see cref="CodeElements"/> instance
+        /// </summary>
+        /// <param name="elements"></param>
+        /// <returns></returns>
+        public static CodeInterface FindInterface(this CodeElements elements)
+        {
+            // Loop
+            foreach (CodeElement element in elements)
+            {
+                // Get element as interface
+                CodeInterface myInterface = element as CodeInterface;
+
+                // if it is interface then return
+                if (myInterface != null)
+                    return myInterface;
+
+                // Or recurse the clidren
+                myInterface = FindInterface(element.Children);
+
+                // if found return
+                if (myInterface != null)
+                    return myInterface;
+            }
+
+            // Oppss. We didnt find it
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the <see cref="UIHierarchyItem"/> from dte with the given name
+        /// </summary>
+        /// <param name="hierarchyItems">Current hierarchy items to look for</param>
+        /// <param name="name">Name of the item</param>
+        /// <returns>null if not found otherwise returns the found item</returns>
+        public static UIHierarchyItem GetHierarchyItem(this UIHierarchyItems hierarchyItems, string name)
+        {
+            // Get count
+            int count = hierarchyItems.Count;
+
+            // Loop 
+            for (int i = 1; i <= count; i++)
+            {
+                // Get inner item
+                UIHierarchyItem hierarchyItem = hierarchyItems.Item(i);
+
+                if (hierarchyItem.Name.Equals(name))
+                    return hierarchyItem;
+
+                if (hierarchyItem.UIHierarchyItems.Count != 0)
+                {
+                    UIHierarchyItem childItem = hierarchyItem.UIHierarchyItems.GetHierarchyItem(name);
+
+                    if (childItem != null)
+                        return childItem;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Retrieves the selected hierarchy item in the given solution
         /// </summary>
         /// <param name="solution">Current solution</param>

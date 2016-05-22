@@ -3,7 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:ProxyMgr.ProxyManager"
     xmlns:ui="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.12.0"
-    Title="Service Proxy Configuration" Height="315" Width="600" ResizeMode="NoResize"
+    Title="Service Proxy Configuration" Height="300" Width="600" ResizeMode="NoResize"
                  FocusManager.FocusedElement="{Binding ElementName=serviceAddrInput}" 
     WindowStartupLocation="CenterScreen" Margin="0" Padding="0">
 
@@ -69,7 +69,6 @@
             <Label FontWeight="Bold" Content="Generation Type:" Margin="0,5,0,0" Style="{StaticResource seperator}" />
             <StackPanel>
                 <CheckBox Content="Generate Client Classes" IsChecked="{Binding GenerateClient}" />
-                <CheckBox Content="Use XmlSerializer (Check this only for invalid xsd's and invalid wsdl.)" IsChecked="{Binding UseXmlSerializer}" />
             </StackPanel>
             <Grid Margin="0,10,0,0">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Right">

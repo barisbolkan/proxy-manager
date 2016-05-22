@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using EnvDTE;
@@ -54,9 +53,7 @@ namespace ProxyMgr.ProxyManager
             get
             {
                 if (logWriter == null)
-                {
                     logWriter = new OutputWindowWriter(this);
-                }
 
                 return logWriter;
             }
@@ -72,9 +69,7 @@ namespace ProxyMgr.ProxyManager
         /// initialization is the Initialize method.
         /// </summary>
         public ProxyManagerPackage()
-        {
-            Debug.WriteLine(string.Format(CultureInfo.CurrentCulture, "Entering constructor for: {0}", this.ToString()));
-        }
+        { }
         #endregion
 
         #region Package Members
@@ -84,9 +79,6 @@ namespace ProxyMgr.ProxyManager
         /// </summary>
         protected override void Initialize()
         {
-            // Log
-            LogWriter.WriteLine("[OK] Intializing Proxy Manager...");
-
             // Signal base
             base.Initialize();
 
@@ -108,9 +100,6 @@ namespace ProxyMgr.ProxyManager
                 configureMenuCommand.BeforeQueryStatus += menuCommand_BeforeQueryStatus;
                 mcs.AddCommand(configureMenuCommand);
                 mcs.AddCommand(new OleMenuCommand(AddMenuItemClicked, addCommandID));
-
-                // Log
-                LogWriter.WriteLine("[OK] Menu items and commands created.");
             }
         }
 
@@ -181,7 +170,7 @@ namespace ProxyMgr.ProxyManager
         /// </summary>
         private void AddMenuItemClicked(object sender, EventArgs e)
         {
-            this.ShowProxyEntry(new ProxyEntryViewModel());
+            this.ShowProxyEntry(new ProxyEntryInformation());
         }
 
         /// <summary>
@@ -199,35 +188,33 @@ namespace ProxyMgr.ProxyManager
             string selectedItemName = selectedProjectItem.Name;
             string fullpath = Path.GetDirectoryName(selectedProjectItem.Properties.Item("FullPath").Value.ToString());
             string svcMapFilePath = string.Concat(fullpath, Path.DirectorySeparatorChar, selectedItemName, ProxyMgrConstants.SvcmapFileExtension);
-            ProxyEntryInfo map = null;
+            ProxyEntryInformation context = null;
 
             // Read svcmap file
             if (File.Exists(svcMapFilePath))
             {
                 using (System.IO.FileStream file = File.Open(svcMapFilePath, FileMode.Open, FileAccess.Read))
                 {
-                    map = file.Deserialize<ProxyEntryInfo>();
+                    context = file.Deserialize<ProxyEntryInformation>();
                 }
             }
 
-            // Log
-            LogWriter.WriteLine(string.Format((map == null ? "{0} file not found." : "{0} file found."), svcMapFilePath));
+            // Check context
+            if (context == null)
+            {
+                LogWriter.WriteLine(string.Format("[ WARNING ] {0} file not found.", svcMapFilePath));
+                context = new ProxyEntryInformation() { ServiceName = selectedItemName, ShowMissingMap = false };
+            }
+
+            context.IsAddContext = false;
 
             // Show input entry window
-            this.ShowProxyEntry(new ProxyEntryViewModel()
-            {
-                GenerateClient = map == null ? false : map.GenerateClient,
-                IsAddContext = false,
-                ServiceAddress = (map == null ? null : map.Url),
-                ServiceName = selectedItemName,
-                UseXmlSerializer = map == null ? false : map.UseXmlSerializer,
-                ShowMissingMap = (map == null ? true : (string.IsNullOrWhiteSpace(map.Url) ? true : false))
-            });
+            this.ShowProxyEntry(context);
         }
         #endregion
 
         #region Events
-        private void dialog_OnProxyEntered(object sender, ProxyEntryInfo e)
+        private void dialog_OnProxyEntered(object sender, ProxyEntryInformation pInfo)
         {
             // Get active project
             DTE dte = (DTE)GetService(typeof(DTE));
@@ -240,97 +227,130 @@ namespace ProxyMgr.ProxyManager
             IVsWCFReferenceGroupCollection serviceReferences = this.GetWCFServices(solution.GetSelectedHierarchy(out itemId));
 
             // Create project file variables
-            bool wcfMetadataExists = serviceReferences.Count() > 0;
             string languageFileExtension = GetLanguageFileExtension(activeProject);
             string projectFile = activeProject.FullName;    // C:\MySampleApp\MySampleApp\MySampleApp.csproj
-            string metadataDirectory = string.Concat(ProxyMgrConstants.PackageFolderName, Path.DirectorySeparatorChar); // Service Proxies\
-            string metadataStorageDirectory = string.Concat(metadataDirectory, e.Name, Path.DirectorySeparatorChar);    // Service Proxies\Input\
-            string generatedCodeFile = string.Format(ProxyMgrConstants.GeneratedCodeFileNameTemplate, e.Name, languageFileExtension);  // input.proxy.cs
-            string generatedCodeFilePath = string.Format(ProxyMgrConstants.GeneratedCodeFilePathTemplate, Path.GetDirectoryName(projectFile) + Path.DirectorySeparatorChar, metadataStorageDirectory, generatedCodeFile); //C:\MySampleApp\MySampleApp\Service Proxies\Input\input.proxy.cs
-            string arguments = string.Format(ProxyMgrConstants.SvcutilCommandArgumentTemplate, (e.GenerateClient ? "" : "/sc"), e.Url, generatedCodeFilePath, languageFileExtension, e.UseXmlSerializer ? "XmlSerializer" : "DataContractSerializer", activeProject.Name, e.Name);
-            string depentUponPath = string.Concat(metadataStorageDirectory, string.Concat(e.Name, ProxyMgrConstants.SvcmapFileExtension));
-            string svcmapFilePath = string.Concat(Path.GetDirectoryName(projectFile), Path.DirectorySeparatorChar, depentUponPath);
+            string generatedCodeFilePath = string.Format(@"{0}\{1}\{2}\{2}.proxy.{3}", Path.GetDirectoryName(projectFile), ProxyMgrConstants.PackageFolderName, pInfo.ServiceName, languageFileExtension); //C:\MySampleApp\MySampleApp\Service Proxies\Input\
+            string svcmapFilePath = string.Format(@"{0}\{1}{2}", Path.GetDirectoryName(generatedCodeFilePath), pInfo.ServiceName, ProxyMgrConstants.SvcmapFileExtension);
+            List<string> itemsToCheckout = new List<string>(2);
+            FileStream svcMapStream = null;
 
-            // Log all project file variables
-            LogWriter.WriteLine("Project File: " + projectFile);
-            LogWriter.WriteLine("Metadata Directory: " + metadataDirectory);
-            LogWriter.WriteLine("Metadata Storage Directory: " + metadataStorageDirectory);
-            LogWriter.WriteLine("Generated Code File: " + generatedCodeFile);
-            LogWriter.WriteLine("Generated Code File Path: " + generatedCodeFilePath);
-            LogWriter.WriteLine("Svcmap File Path: " + svcmapFilePath);
-            LogWriter.WriteLine("WCF Metadata Exists: " + wcfMetadataExists);
+            // Log 
+            LogWriter.WriteLine(@"****************** PROXY GENERATION STARTED: " + pInfo.ServiceAddress + " ******************");
+            LogWriter.WriteLine("[ OK ] State: " + (pInfo.IsAddContext ? "Add" : "Configure"));
+            LogWriter.WriteLine("[ OK ] CodeFilePath: " + generatedCodeFilePath);
+            LogWriter.WriteLine("[ OK ] MapFilePath : " + svcmapFilePath);
 
-            // Execute external process
-            if (this.ExecuteProcessWithArguments(ProxyMgrConstants.SvcUtilPath, arguments))
+            // if intended service not exists
+            if (serviceReferences.GetReferenceGroupByName(pInfo.ServiceName, pInfo.ServiceName) == null)
             {
-                // Load the project file
-                var project = Microsoft.Build.Evaluation.ProjectCollection.GlobalProjectCollection.LoadProject(projectFile);
+                if (!Directory.Exists(Path.GetDirectoryName(generatedCodeFilePath)))
+                    Directory.CreateDirectory(Path.GetDirectoryName(generatedCodeFilePath));
 
-                // Check for WCFMetadata 
-                // Meaning that if any service reference added to project file or not
-                // <WCFMetadata></WCFMetadata>
-                if (!wcfMetadataExists)
-                {
-                    // Create metadata in project file
-                    project.AddItem(ProxyMgrConstants.ProjectFileSvcItemName, metadataDirectory);
-
-                    // Add needed references
-                    project.AddItem(ProxyMgrConstants.ReferenceTagName, ProxyMgrConstants.SerializationAssemblyNamespace);
-                    project.AddItem(ProxyMgrConstants.ReferenceTagName, ProxyMgrConstants.ServiceModelAssemblyNamespace);
-                }
-
-                FileStream stream = null;
-
-                // Now we can add service storage directory
-                if (serviceReferences.GetReferenceGroupByName(e.Name, e.Name) == null)
-                {
-                    // Get collection
-                    project.AddItem(ProxyMgrConstants.ProjectFileSvcStorageItemName, metadataStorageDirectory);
-                    stream = File.Create(svcmapFilePath);
-
-                    // Add genereted file to folder
-                    project.AddItem(ProxyMgrConstants.CompileTagName, string.Concat(metadataStorageDirectory, generatedCodeFile), new List<KeyValuePair<string, string>>() { 
-                        new KeyValuePair<string, string>(ProxyMgrConstants.AutoGenerateTagName, ProxyMgrConstants.AutoGenerationTagValue),
-                        new KeyValuePair<string, string>(ProxyMgrConstants.DesignTimeTagName, ProxyMgrConstants.DesignTimeTagValue),
-                        new KeyValuePair<string, string>(ProxyMgrConstants.DependentUponTagName, string.Concat(e.Name, ".svcmap"))
-                    });
-                    project.AddItem(ProxyMgrConstants.NoneTagName, depentUponPath, new List<KeyValuePair<string, string>>() { 
-                        new KeyValuePair<string, string>(ProxyMgrConstants.GeneratorTagName, ProxyMgrConstants.GeneratorTagValue)
-                    });
-                }
-                else
-                {
-                    stream = File.Open(svcmapFilePath, FileMode.Truncate, FileAccess.Write);
-                }
-
-                using (stream)
-                {
-                    stream.Serialize(e);
-                }
-
-                // Change project type and save
-                Microsoft.Build.Evaluation.ProjectCollection.GlobalProjectCollection.UnloadProject(project);
-                activeProject.Save();
-                project.ReevaluateIfNecessary();
-
-                // Reload project
-                this.Reload(activeProject);
+                svcMapStream = File.Create(svcmapFilePath);
+                this.CheckOutItems(dte, projectFile);
             }
             else
             {
-                this.ShowError("There is an error occured while creating the proxy. Please check for 'Output Window/Proxy Generation' for details.");
+                if (pInfo.IsAddContext)
+                {
+                    // Service proxy exists
+                    ShowError("[ FAIL ] Intended Service Reference name is exists. Please enter another name for proxy!");
+                    return;
+                }
+
+                if (!File.Exists(svcmapFilePath))
+                {
+                    // Something went worng error
+                    ShowError("[ FAIL ] Service mapping file is missing. Check path: " + svcmapFilePath);
+                    return;
+                }
+
+                this.CheckOutItems(dte, svcmapFilePath, generatedCodeFilePath);
+                svcMapStream = File.Open(svcmapFilePath, FileMode.Truncate, FileAccess.Write);
             }
+
+            using (svcMapStream)
+                svcMapStream.Serialize(pInfo);
+
+            // Generate code
+            this.GenerateServiceProxy(activeProject, pInfo);
+
+            if (pInfo.IsAddContext)
+                this.ManipulateProjectFile(projectFile, (serviceReferences.Count() > 0), languageFileExtension, pInfo.ServiceName);
+
+            // Save the project!!!
+            activeProject.Save();
+
+            // Reload project
+            this.Reload(activeProject);
         }
         #endregion
 
         #region Helper Methods
+        /// <summary>
+        /// Checks out the item if item is in source control
+        /// </summary>
+        /// <param name="dte">Current dte</param>
+        /// <param name="items">item names to checked out</param>
+        private void CheckOutItems(DTE dte, params string[] items)
+        {
+            // Check if source control exists and checkout item if it is not checked out
+            if (dte.SourceControl != null)
+                foreach (string item in items)
+                    if (dte.SourceControl.IsItemUnderSCC(item) && !dte.SourceControl.IsItemCheckedOut(item))
+                        dte.SourceControl.CheckOutItem(item);
+        }
+
+        private bool GenerateServiceProxy(Project activeProject, ProxyEntryInformation pInfo)
+        {
+            string languageFileExtension = this.GetLanguageFileExtension(activeProject);
+            string generatedCodeFilePath = string.Format(@"{0}\{1}\{2}\{2}.proxy.{3}", Path.GetDirectoryName(activeProject.FullName), ProxyMgrConstants.PackageFolderName, pInfo.ServiceName, languageFileExtension); //C:\MySampleApp\MySampleApp\Service Proxies\Input\
+            string arguments = string.Format(ProxyMgrConstants.SvcutilCommandArgumentTemplate, (pInfo.GenerateClient ? "" : "/sc"), pInfo.ServiceAddress, generatedCodeFilePath, languageFileExtension, "Auto", activeProject.Name, pInfo.ServiceName);
+            string executionWarning = null;
+            bool operationIsSuccess = false;
+
+            // Execute external process
+            if (this.ExecuteProcessWithArguments(ProxyMgrConstants.SvcUtilPath, arguments, out executionWarning))
+            {
+                operationIsSuccess = true;
+
+                // Get newly added project file
+                // When ProcjectItems.AddFromFile method called it adds Compile tag in project file
+                // We need this because we are going to look up to interface is created or not!
+                ProjectItem generatedCodeProjectItem = activeProject.ProjectItems.AddFromFile(generatedCodeFilePath);
+
+                // We have to check generated code file because it may contain service interface or not
+                // If it doesn't contain service interface then we  have to generate the code again with XmlSerializer
+                if (generatedCodeProjectItem.FileCodeModel.CodeElements.FindInterface() == null)
+                {
+                    // Log all project file variables
+                    LogWriter.WriteLine("[ WARNING ] Something wrong with service wsdl. Error occured while trying to generate code with 'serializer:Auto' flag. Now changing to XmlSerializer.");
+                    arguments = string.Format(ProxyMgrConstants.SvcutilCommandArgumentTemplate, (pInfo.GenerateClient ? "" : "/sc"), pInfo.ServiceAddress, generatedCodeFilePath, languageFileExtension, "XmlSerializer", activeProject.Name, pInfo.ServiceName);
+
+                    // Generate code again!!!
+                    if (!this.ExecuteProcessWithArguments(ProxyMgrConstants.SvcUtilPath, arguments, out executionWarning))
+                    {
+                        operationIsSuccess = false;
+                        // Log that something wrong!!!
+                        LogWriter.WriteLine("[ FAIL ] Something went wrong while generating service proxy.");
+                    }
+                }
+
+                // Add as warning
+                if (!string.IsNullOrWhiteSpace(executionWarning))
+                    new ErrorListProvider(this).Tasks.Add(new ErrorTask { Category = TaskCategory.User, ErrorCategory = TaskErrorCategory.Warning, Text = executionWarning });
+            }
+
+            return operationIsSuccess;
+        }
+
         /// <summary>
         /// Executes the given executable in the given path with the given arguments
         /// </summary>
         /// <param name="commandPath">Executable path</param>
         /// <param name="arguments">Arguments</param>
         /// <returns>returns true if execution is success otherwise returns false</returns>
-        private bool ExecuteProcessWithArguments(string commandPath, string arguments)
+        private bool ExecuteProcessWithArguments(string commandPath, string arguments, out string warningInformation)
         {
             // Create process for svcutil.exe
             // Set values of the process
@@ -341,6 +361,7 @@ namespace ProxyMgr.ProxyManager
             svcutilProc.WindowStyle = ProcessWindowStyle.Hidden;
             svcutilProc.Arguments = arguments;
             svcutilProc.RedirectStandardError = true;
+            warningInformation = null;
 
             try
             {
@@ -352,27 +373,14 @@ namespace ProxyMgr.ProxyManager
                     exeProcess.WaitForExit();
 
                     // Get errors if exists
-                    string error = exeProcess.StandardError.ReadToEnd();
+                    string warning = exeProcess.StandardError.ReadToEnd();
 
                     // Check operation state
                     if (exeProcess.ExitCode != 0)
-                        throw new Exception(error);
+                        throw new Exception(warning);
 
-                    if (!string.IsNullOrWhiteSpace(error))
-                    {
-                        LogWriter.WriteLine("[OK] Process execution completed with warnings.");
-                        // Add as warning
-                        new ErrorListProvider(this).Tasks.Add(new ErrorTask
-                        {
-                            Category = TaskCategory.User,
-                            ErrorCategory = TaskErrorCategory.Warning,
-                            Text = error
-                        });
-                    }
-                    else
-                    {
-                        LogWriter.WriteLine("[OK] Process execution completed successfully.");
-                    }
+                    LogWriter.WriteLine(string.Format("[ {0} ] Process execution completed.", !string.IsNullOrWhiteSpace(warning) ? "WARNING" : "OK"));
+                    warningInformation = warning;
 
                     // If came to here everything is fine
                     return true;
@@ -381,8 +389,8 @@ namespace ProxyMgr.ProxyManager
             catch (Exception ex)
             {
                 // Log error.
-                LogWriter.WriteLine("[FAIL] Process execution failure! Exception info: " + ex.ToString());
-                LogWriter.WriteLine("[FAIL] Process call arguments: " + arguments);
+                LogWriter.WriteLine("[ FAIL ] Process execution failure! Exception info: " + ex.ToString());
+                LogWriter.WriteLine("[ FAIL ] Process call arguments: " + arguments);
 
                 return false;
             }
@@ -392,7 +400,7 @@ namespace ProxyMgr.ProxyManager
         /// Shows the input etry window with the given model
         /// </summary>
         /// <param name="model">Model to bind to</param>
-        private void ShowProxyEntry(ProxyEntryViewModel model)
+        private void ShowProxyEntry(ProxyEntryInformation model)
         {
             ProxyEntry dialog = new ProxyEntry(model);
             // Attach event
@@ -450,6 +458,57 @@ namespace ProxyMgr.ProxyManager
         }
 
         /// <summary>
+        /// Manipulates the given project file for adding wcf service metadata storages
+        /// </summary>
+        /// <param name="projectFile">Current active project file</param>
+        /// <param name="addServiceRefMetadata"></param>
+        /// <param name="languageFileExtension"></param>
+        /// <param name="name"></param>
+        private void ManipulateProjectFile(string projectFile, bool addServiceRefMetadata, string languageFileExtension, string name)
+        {
+            string metadataDirectory = string.Concat(ProxyMgrConstants.PackageFolderName, Path.DirectorySeparatorChar); // Service Proxies\
+            string metadataStorageDirectory = string.Concat(metadataDirectory, name, Path.DirectorySeparatorChar);    // Service Proxies\Input\
+            string generatedCodeFile = string.Format(ProxyMgrConstants.GeneratedCodeFileNameTemplate, name, languageFileExtension);  // input.proxy.cs
+            string dependUponPath = string.Concat(metadataStorageDirectory, string.Concat(name, ProxyMgrConstants.SvcmapFileExtension));
+
+            var project = Microsoft.Build.Evaluation.ProjectCollection.GlobalProjectCollection.LoadProject(projectFile);
+
+            // Check for WCFMetadata 
+            // Meaning that if any service reference added to project file or not
+            // <WCFMetadata></WCFMetadata>
+            if (!addServiceRefMetadata)
+            {
+                // Create metadata in project file
+                project.AddItem(ProxyMgrConstants.ProjectFileSvcItemName, metadataDirectory);
+
+                // Add needed references
+                project.AddItem(ProxyMgrConstants.ReferenceTagName, ProxyMgrConstants.SerializationAssemblyNamespace);
+                project.AddItem(ProxyMgrConstants.ReferenceTagName, ProxyMgrConstants.ServiceModelAssemblyNamespace);
+            }
+
+            // Get collection
+            project.AddItem(ProxyMgrConstants.ProjectFileSvcStorageItemName, metadataStorageDirectory);
+
+            // Find newly added file
+            foreach (var item in project.GetItems(ProxyMgrConstants.CompileTagName))
+            {
+                if (item.EvaluatedInclude.Equals(string.Concat(metadataStorageDirectory, generatedCodeFile)))
+                {
+                    item.SetMetadataValue(ProxyMgrConstants.AutoGenerateTagName, ProxyMgrConstants.AutoGenerationTagValue);
+                    item.SetMetadataValue(ProxyMgrConstants.DesignTimeTagName, ProxyMgrConstants.DesignTimeTagValue);
+                    item.SetMetadataValue(ProxyMgrConstants.DependentUponTagName, string.Concat(name, ProxyMgrConstants.SvcmapFileExtension));
+                }
+            }
+
+            project.AddItem(ProxyMgrConstants.NoneTagName, dependUponPath, new List<KeyValuePair<string, string>>() { 
+                new KeyValuePair<string, string>(ProxyMgrConstants.GeneratorTagName, ProxyMgrConstants.GeneratorTagValue) 
+            });
+
+            // Change project type and save
+            Microsoft.Build.Evaluation.ProjectCollection.GlobalProjectCollection.UnloadProject(project);
+        }
+
+        /// <summary>
         /// GEts the WCF service references added to selected hierarchy
         /// </summary>
         /// <param name="hierarchy"></param>
@@ -475,26 +534,25 @@ namespace ProxyMgr.ProxyManager
             try
             {
                 DTE dte = GetService(typeof(DTE)) as DTE;
-                string projectPathToSelect = string.Concat(Path.GetFileNameWithoutExtension(dte.Solution.FullName), Path.DirectorySeparatorChar, project.Name);
-                string projectItemPathToSelect = string.Concat(projectPathToSelect, Path.DirectorySeparatorChar, ProxyMgrConstants.PackageFolderName);
+                string projectName = ((dte.ActiveSolutionProjects as Array).GetValue(0) as Project).Name;
 
-                // Activate 
-                dte.Windows.Item(EnvDTE.Constants.vsWindowKindSolutionExplorer).Activate();
                 // Select the project
-                ((EnvDTE80.DTE2)dte).ToolWindows.SolutionExplorer.GetItem(projectPathToSelect).Select(vsUISelectionType.vsUISelectionTypeSelect);
+                ((EnvDTE80.DTE2)dte).ToolWindows.SolutionExplorer.UIHierarchyItems.GetHierarchyItem(projectName).Select(vsUISelectionType.vsUISelectionTypeSelect);
 
                 // Unlooad & load
                 dte.ExecuteCommand(ProxyMgrConstants.ProjectUnloadCommand);
                 dte.ExecuteCommand(ProxyMgrConstants.ProjectReloadCommand);
 
                 // Select References folder
-                ((EnvDTE80.DTE2)dte).ToolWindows.SolutionExplorer.GetItem(projectItemPathToSelect).Select(vsUISelectionType.vsUISelectionTypeSelect);
+                // This is very strange because after reload i guess hierarchy is changing. 
+                // Because of that we cant get a reference of selected hierarchy, we have to retrieve it again.
+                ((EnvDTE80.DTE2)dte).ToolWindows.SolutionExplorer.UIHierarchyItems.GetHierarchyItem(projectName).UIHierarchyItems.GetHierarchyItem("Service References").Select(vsUISelectionType.vsUISelectionTypeSelect);
 
-                LogWriter.WriteLine("[OK] Project references selected and reloaded.");
+                LogWriter.WriteLine("[ OK ] Project  reloaded.");
             }
             catch (Exception ex)
             {
-                LogWriter.WriteLine("[FAIL] Project reload failed! Exception: " + ex.ToString());
+                LogWriter.WriteLine("[ FAIL ] Project reload failed! Exception: " + ex.ToString());
             }
         }
         #endregion
