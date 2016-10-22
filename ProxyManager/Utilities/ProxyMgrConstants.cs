@@ -12,6 +12,10 @@
         /// </summary>
         public const string SvcUtilPath = @"C:\Program Files (x86)\Microsoft SDKs\Windows\v8.0A\bin\NETFX 4.0 Tools\svcutil.exe";
 
+        public static string[] ReusableLibraries = new string[] { 
+            @"System.dll"
+        };
+
         /// <summary>
         /// To show folder different from others, this is needed to include to project file
         /// </summary>
@@ -40,7 +44,7 @@
         /// <summary>
         /// To generate the code, this is needed to pass to svcutil as arguments
         /// </summary>
-        public const string SvcutilCommandArgumentTemplate = @"{0} ""{1}"" /out:""{2}"" /l:{3} /serializer:{4} /n:*,{5}.{6}";
+        public const string SvcutilCommandArgumentTemplate = @"/t:code {0} /out:""{1}"" {2} {3} /n:*,{4}.{5}";
 
         /// <summary>
         /// Compile Tag name for project file

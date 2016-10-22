@@ -1,5 +1,6 @@
-﻿using System;
+﻿using Microsoft.Win32;
 using ProxyMgr.ProxyManager.ViewModel;
+using System;
 
 namespace ProxyMgr.ProxyManager.Views
 {
@@ -53,6 +54,38 @@ namespace ProxyMgr.ProxyManager.Views
                 // Close the form!!!
                 this.Close();
             }
+        }
+
+        private void btnFile_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            ProxyEntryInformation proxyInformation = (this.DataContext as ProxyEntryInformation);
+            OpenFileDialog openFileDialog = new OpenFileDialog()
+            {
+                Filter = "WSDL Files|*.wsdl",
+                InitialDirectory = GetWSDLPath(proxyInformation.ServiceAddress)
+            };
+            if (openFileDialog.ShowDialog() == true)
+            {
+                (this.DataContext as ProxyEntryInformation).ServiceAddress = openFileDialog.FileName;
+            }
+        }
+
+        private string GetWSDLPath(string inputPath)
+        {
+            string defaultPath = "C:\\";
+            if (string.IsNullOrWhiteSpace(inputPath))
+            {
+                return defaultPath;
+            }
+
+            Uri serviceUri;
+            bool addressCheck = Uri.TryCreate(inputPath, UriKind.Absolute, out serviceUri);
+            if (addressCheck && serviceUri.IsFile)
+            {
+                return inputPath;
+            }
+
+            return defaultPath;
         }
 
         /// <summary>

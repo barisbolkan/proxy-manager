@@ -3,7 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:ProxyMgr.ProxyManager"
     xmlns:ui="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.12.0"
-    Title="Service Proxy Configuration" Height="300" Width="600" ResizeMode="NoResize"
+    Title="Service Proxy Configuration" Height="305" Width="600" ResizeMode="NoResize"
                  FocusManager.FocusedElement="{Binding ElementName=serviceAddrInput}" 
     WindowStartupLocation="CenterScreen" Margin="0" Padding="0">
 
@@ -47,6 +47,32 @@
                 </TextBlock>
             </Grid>
         </ControlTemplate>
+        <ControlTemplate x:Key="placeholderTemplateWithInput" TargetType="{x:Type ContentControl}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid Grid.Column="0" >
+                    <TextBox Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=DataContext, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                         VerticalAlignment="Center" HorizontalAlignment="Stretch" VerticalContentAlignment="Center" Height="25" x:Name="SearchTermTextBox"/>
+                    <TextBlock IsHitTestVisible="False" Text="{TemplateBinding Tag}" VerticalAlignment="Center" HorizontalAlignment="Left" 
+                           Margin="3,0,0,0" Foreground="DarkGray">
+                        <TextBlock.Style>
+                            <Style TargetType="{x:Type TextBlock}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=SearchTermTextBox}" Value="">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+                <Button Grid.Column="1" Click="btnFile_Click" HorizontalAlignment="Right" Width="25" Content=". . ."></Button>
+            </Grid>
+        </ControlTemplate>
     </Window.Resources>
     <Grid x:Name="container">
         <StackPanel Margin="15">
@@ -61,7 +87,7 @@
             <Label FontWeight="Bold" Content="Service Address:">
             </Label>
             <ContentControl x:Name="serviceAddrInput" DataContext="{Binding Path=ServiceAddress, Mode=TwoWay, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, ValidatesOnNotifyDataErrors=True}" 
-                            Template="{StaticResource placeholderTemplate}" Tag="http://www.sampleurl.com/myservice/myendpoint.svc"></ContentControl>
+                            Template="{StaticResource placeholderTemplateWithInput}" Tag="http://www.sampleurl.com/myservice/myendpoint.svc"></ContentControl>
             <Label FontWeight="Bold" Content="Namespace:" Margin="0,5,0,0"></Label>
             <ContentControl DataContext="{Binding Path=ServiceName, Mode=TwoWay, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, ValidatesOnNotifyDataErrors=True}" 
                             IsEnabled="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}, Path=DataContext.IsAddContext}"
@@ -72,7 +98,7 @@
             </StackPanel>
             <Grid Margin="0,10,0,0">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Right">
-                    <Button IsEnabled="{Binding Path=ButtonEnabled}" Content="OK" Width="100" Height="30" Margin="0,0,10,0" Click="btnOK_Click"></Button>
+                    <Button IsEnabled="{Binding Path=ButtonEnabled}" Content="OK" Width="100" Height="30" Margin="0,0,11,0" Click="btnOK_Click"></Button>
                     <Button Content="Cancel" Width="100" Height="30" Click="btnCancel_Click"></Button>
                 </StackPanel>
             </Grid>

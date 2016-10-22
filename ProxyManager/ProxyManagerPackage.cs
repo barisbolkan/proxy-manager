@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.Design;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
-using EnvDTE;
+﻿using EnvDTE;
+using EnvDTE80;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -12,6 +7,13 @@ using Microsoft.VisualStudio.WCFReference.Interop;
 using ProxyMgr.ProxyManager.Utilities;
 using ProxyMgr.ProxyManager.ViewModel;
 using ProxyMgr.ProxyManager.Views;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.Design;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace ProxyMgr.ProxyManager
 {
@@ -304,8 +306,10 @@ namespace ProxyMgr.ProxyManager
         private bool GenerateServiceProxy(Project activeProject, ProxyEntryInformation pInfo)
         {
             string languageFileExtension = this.GetLanguageFileExtension(activeProject);
+            string frameworkPath = System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory();
+            string reusableLibraries = string.Join(" ", ProxyMgrConstants.ReusableLibraries.Select(r => string.Concat("/r:", frameworkPath + r)));
             string generatedCodeFilePath = string.Format(@"{0}\{1}\{2}\{2}.proxy.{3}", Path.GetDirectoryName(activeProject.FullName), ProxyMgrConstants.PackageFolderName, pInfo.ServiceName, languageFileExtension); //C:\MySampleApp\MySampleApp\Service Proxies\Input\
-            string arguments = string.Format(ProxyMgrConstants.SvcutilCommandArgumentTemplate, (pInfo.GenerateClient ? "" : "/sc"), pInfo.ServiceAddress, generatedCodeFilePath, languageFileExtension, "Auto", activeProject.Name, pInfo.ServiceName);
+            string arguments = string.Format(ProxyMgrConstants.SvcutilCommandArgumentTemplate, (pInfo.GenerateClient ? "" : "/serviceContract "), generatedCodeFilePath, pInfo.ServiceAddress, reusableLibraries, activeProject.Name, pInfo.ServiceName);
             string executionWarning = null;
             bool operationIsSuccess = false;
 
@@ -319,26 +323,13 @@ namespace ProxyMgr.ProxyManager
                 // We need this because we are going to look up to interface is created or not!
                 ProjectItem generatedCodeProjectItem = activeProject.ProjectItems.AddFromFile(generatedCodeFilePath);
 
-                // We have to check generated code file because it may contain service interface or not
-                // If it doesn't contain service interface then we  have to generate the code again with XmlSerializer
-                if (generatedCodeProjectItem.FileCodeModel.CodeElements.FindInterface() == null)
-                {
-                    // Log all project file variables
-                    LogWriter.WriteLine("[ WARNING ] Something wrong with service wsdl. Error occured while trying to generate code with 'serializer:Auto' flag. Now changing to XmlSerializer.");
-                    arguments = string.Format(ProxyMgrConstants.SvcutilCommandArgumentTemplate, (pInfo.GenerateClient ? "" : "/sc"), pInfo.ServiceAddress, generatedCodeFilePath, languageFileExtension, "XmlSerializer", activeProject.Name, pInfo.ServiceName);
-
-                    // Generate code again!!!
-                    if (!this.ExecuteProcessWithArguments(ProxyMgrConstants.SvcUtilPath, arguments, out executionWarning))
-                    {
-                        operationIsSuccess = false;
-                        // Log that something wrong!!!
-                        LogWriter.WriteLine("[ FAIL ] Something went wrong while generating service proxy.");
-                    }
-                }
-
                 // Add as warning
                 if (!string.IsNullOrWhiteSpace(executionWarning))
-                    new ErrorListProvider(this).Tasks.Add(new ErrorTask { Category = TaskCategory.User, ErrorCategory = TaskErrorCategory.Warning, Text = executionWarning });
+                    new ErrorListProvider(this).Tasks.Add(new ErrorTask { 
+                        Category = TaskCategory.User, 
+                        ErrorCategory = TaskErrorCategory.Warning, 
+                        Text = executionWarning 
+                    });
             }
 
             return operationIsSuccess;
@@ -536,17 +527,17 @@ namespace ProxyMgr.ProxyManager
                 DTE dte = GetService(typeof(DTE)) as DTE;
                 string projectName = ((dte.ActiveSolutionProjects as Array).GetValue(0) as Project).Name;
 
-                // Select the project
-                ((EnvDTE80.DTE2)dte).ToolWindows.SolutionExplorer.UIHierarchyItems.GetHierarchyItem(projectName).Select(vsUISelectionType.vsUISelectionTypeSelect);
-
-                // Unlooad & load
-                dte.ExecuteCommand(ProxyMgrConstants.ProjectUnloadCommand);
-                dte.ExecuteCommand(ProxyMgrConstants.ProjectReloadCommand);
-
                 // Select References folder
                 // This is very strange because after reload i guess hierarchy is changing. 
                 // Because of that we cant get a reference of selected hierarchy, we have to retrieve it again.
-                ((EnvDTE80.DTE2)dte).ToolWindows.SolutionExplorer.UIHierarchyItems.GetHierarchyItem(projectName).UIHierarchyItems.GetHierarchyItem("Service References").Select(vsUISelectionType.vsUISelectionTypeSelect);
+                string path = GetSelectionPath(dte as EnvDTE80.DTE2, projectName);
+                ((EnvDTE80.DTE2)dte).ToolWindows.SolutionExplorer.GetItem(GetSelectionPath(dte as EnvDTE80.DTE2, projectName)).Select(vsUISelectionType.vsUISelectionTypeSelect);
+                dte.Windows.Item(EnvDTE.Constants.vsWindowKindSolutionExplorer).Activate();
+
+                dte.ExecuteCommand(ProxyMgrConstants.ProjectUnloadCommand);
+                dte.ExecuteCommand(ProxyMgrConstants.ProjectReloadCommand);
+
+                ((EnvDTE80.DTE2)dte).ToolWindows.SolutionExplorer.GetItem(GetSelectionPath(dte as EnvDTE80.DTE2, projectName)).UIHierarchyItems.GetHierarchyItem("Service References").Select(vsUISelectionType.vsUISelectionTypeSelect);
 
                 LogWriter.WriteLine("[ OK ] Project  reloaded.");
             }
@@ -554,6 +545,66 @@ namespace ProxyMgr.ProxyManager
             {
                 LogWriter.WriteLine("[ FAIL ] Project reload failed! Exception: " + ex.ToString());
             }
+        }
+
+        private string GetSelectionPath(EnvDTE80.DTE2 dte2, string lookup)
+        {
+            string selectionPath = null;
+            string solutionName = Path.GetFileNameWithoutExtension(dte2.Solution.FullName);
+            Solution solution = dte2.Solution;
+
+            foreach (Project project in solution)
+            {
+                if (project.Kind == ProjectKinds.vsProjectKindSolutionFolder)
+                {
+                    // Loop solution folder
+                    selectionPath = SearchChildProjects(project, lookup);
+                    if (!string.IsNullOrWhiteSpace(selectionPath))
+                    {
+                        break;
+                    }
+                }
+                else if (project.Name == lookup)
+                {
+                    selectionPath = project.Name;
+                    break;
+                }
+            }
+
+            return string.Format(@"{0}\{1}", solutionName, selectionPath);
+        }
+
+        private string SearchChildProjects(Project project, string lookup)
+        {
+            int itemCount = project.ProjectItems.Count;
+            string selectionPath = string.Empty;
+
+            for (int i = 1; i <= itemCount; i++)
+            {
+                ProjectItem currentProjectItem = project.ProjectItems.Item(i);
+                Project subProject = currentProjectItem.SubProject;
+
+                if (subProject == null)
+                {
+                    if (project.Name == lookup)
+                    {
+                        return lookup;
+                    }
+
+                    return null;
+                }
+                else
+                {
+                    selectionPath = SearchChildProjects(subProject, lookup);
+                    if (!string.IsNullOrWhiteSpace(selectionPath))
+                    {
+                        selectionPath = project.Name + "\\" + selectionPath;
+                        break;
+                    }
+                }
+            }
+
+            return selectionPath;
         }
         #endregion
 
