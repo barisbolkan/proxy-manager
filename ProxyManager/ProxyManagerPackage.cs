@@ -317,19 +317,19 @@ namespace ProxyMgr.ProxyManager
             if (this.ExecuteProcessWithArguments(ProxyMgrConstants.SvcUtilPath, arguments, out executionWarning))
             {
                 operationIsSuccess = true;
+                // Add as warning
+                if (!string.IsNullOrWhiteSpace(executionWarning))
+                    new ErrorListProvider(this).Tasks.Add(new ErrorTask
+                    {
+                        Category = TaskCategory.User,
+                        ErrorCategory = TaskErrorCategory.Warning,
+                        Text = executionWarning
+                    });
 
                 // Get newly added project file
                 // When ProcjectItems.AddFromFile method called it adds Compile tag in project file
                 // We need this because we are going to look up to interface is created or not!
                 ProjectItem generatedCodeProjectItem = activeProject.ProjectItems.AddFromFile(generatedCodeFilePath);
-
-                // Add as warning
-                if (!string.IsNullOrWhiteSpace(executionWarning))
-                    new ErrorListProvider(this).Tasks.Add(new ErrorTask { 
-                        Category = TaskCategory.User, 
-                        ErrorCategory = TaskErrorCategory.Warning, 
-                        Text = executionWarning 
-                    });
             }
 
             return operationIsSuccess;

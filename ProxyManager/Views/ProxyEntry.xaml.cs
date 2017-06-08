@@ -61,7 +61,7 @@ namespace ProxyMgr.ProxyManager.Views
             ProxyEntryInformation proxyInformation = (this.DataContext as ProxyEntryInformation);
             OpenFileDialog openFileDialog = new OpenFileDialog()
             {
-                Filter = "WSDL Files|*.wsdl",
+                Filter = "WSDL-XML Files|*.wsdl;*.xml",
                 InitialDirectory = GetWSDLPath(proxyInformation.ServiceAddress)
             };
             if (openFileDialog.ShowDialog() == true)
