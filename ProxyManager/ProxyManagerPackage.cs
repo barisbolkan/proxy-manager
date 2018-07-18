@@ -226,6 +226,7 @@ namespace ProxyMgr.ProxyManager
             IVsSolution solution = GetService(typeof(IVsSolution)) as IVsSolution;
             // Get WCF Service references
             uint itemId = VSConstants.VSITEMID_NIL;
+
             IVsWCFReferenceGroupCollection serviceReferences = this.GetWCFServices(solution.GetSelectedHierarchy(out itemId));
 
             // Create project file variables
@@ -361,7 +362,10 @@ namespace ProxyMgr.ProxyManager
                 using (System.Diagnostics.Process exeProcess = System.Diagnostics.Process.Start(svcutilProc))
                 {
                     // Wait for execution
-                    exeProcess.WaitForExit();
+                    if (!exeProcess.WaitForExit(30 * 1000))
+                    {
+                        exeProcess.Kill();
+                    }
 
                     // Get errors if exists
                     string warning = exeProcess.StandardError.ReadToEnd();
@@ -383,7 +387,7 @@ namespace ProxyMgr.ProxyManager
                 LogWriter.WriteLine("[ FAIL ] Process execution failure! Exception info: " + ex.ToString());
                 LogWriter.WriteLine("[ FAIL ] Process call arguments: " + arguments);
 
-                return false;
+                throw ex;
             }
         }
 
@@ -491,8 +495,8 @@ namespace ProxyMgr.ProxyManager
                 }
             }
 
-            project.AddItem(ProxyMgrConstants.NoneTagName, dependUponPath, new List<KeyValuePair<string, string>>() { 
-                new KeyValuePair<string, string>(ProxyMgrConstants.GeneratorTagName, ProxyMgrConstants.GeneratorTagValue) 
+            project.AddItem(ProxyMgrConstants.NoneTagName, dependUponPath, new List<KeyValuePair<string, string>>() {
+                new KeyValuePair<string, string>(ProxyMgrConstants.GeneratorTagName, ProxyMgrConstants.GeneratorTagValue)
             });
 
             // Change project type and save

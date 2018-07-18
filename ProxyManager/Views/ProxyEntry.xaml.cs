@@ -1,6 +1,7 @@
 ﻿using Microsoft.Win32;
 using ProxyMgr.ProxyManager.ViewModel;
 using System;
+using System.Windows;
 
 namespace ProxyMgr.ProxyManager.Views
 {
@@ -43,17 +44,40 @@ namespace ProxyMgr.ProxyManager.Views
         /// <param name="e"></param>
         private void btnOK_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            // Get handle of the proxy event 
-            EventHandler<ProxyEntryInformation> handler = OnProxyEntered;
-
-            // If anyone attached to event then fire it
-            if (handler != null)
+            if (OnProxyEntered != null)
             {
-                handler(this, (this.DataContext as ProxyEntryInformation));
-
-                // Close the form!!!
-                this.Close();
+                container.IsEnabled = false;
+                System.Threading.ThreadPool.QueueUserWorkItem(new System.Threading.WaitCallback((obj) =>
+                {
+                    AcquireServiceProxy(obj as ProxyEntryInformation);
+                }), DataContext);
             }
+        }
+
+        private void AcquireServiceProxy(ProxyEntryInformation dataContext)
+        {
+            System.Threading.Thread.Sleep(10);
+
+            Dispatcher.Invoke(() =>
+            {
+                System.Windows.Input.Cursor currentCursor = Cursor;
+
+                try
+                {
+                    Cursor = System.Windows.Input.Cursors.Wait;
+                    OnProxyEntered(this, dataContext);
+
+                    container.IsEnabled = true;
+                    Cursor = currentCursor;
+                    this.Close();
+                }
+                catch (Exception ex)
+                {
+                    container.IsEnabled = true;
+                    Cursor = currentCursor;
+                    MessageBox.Show(ex.Message);
+                }
+            });
         }
 
         private void btnFile_Click(object sender, System.Windows.RoutedEventArgs e)
