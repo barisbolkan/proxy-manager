@@ -12,6 +12,11 @@
         /// </summary>
         public const string SvcUtilPath = @"C:\Program Files (x86)\Microsoft SDKs\Windows\v8.0A\bin\NETFX 4.0 Tools\svcutil.exe";
 
+        /// <summary>
+        /// Path for the svcutil.exe to generate the service proxy
+        /// </summary>
+        public const string SvcUtilPathWin10 = @"C:\Program Files (x86)\Microsoft SDKs\Windows\v8.1A\bin\NETFX 4.5.1 Tools\SvcUtil.exe";
+
         public static string[] ReusableLibraries = new string[] { 
             @"System.dll"
         };
