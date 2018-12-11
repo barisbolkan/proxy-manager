@@ -314,8 +314,12 @@ namespace ProxyMgr.ProxyManager
             string executionWarning = null;
             bool operationIsSuccess = false;
 
+            string path = ProxyMgrConstants.SvcUtilPath;
+            if (!File.Exists(path))
+                path = ProxyMgrConstants.SvcUtilPathWin10;
+
             // Execute external process
-            if (this.ExecuteProcessWithArguments(ProxyMgrConstants.SvcUtilPath, arguments, out executionWarning))
+            if (this.ExecuteProcessWithArguments(path, arguments, out executionWarning))
             {
                 operationIsSuccess = true;
                 // Add as warning
